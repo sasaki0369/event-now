@@ -1423,33 +1423,39 @@ function mountMain(initState, role, opKey, initialTab){
     var curIdx=progs.findIndex(function(p){return p.id===pid;});
 
     // 最後に実績登録されたインデックスを探す（予測登録は除く）
-    var lastRealIdx=-1;
-    progs.forEach(function(p,i){if(p.startedAt&&!p.isEstimated&&i<curIdx)lastRealIdx=i;});
+    var lastRealIdx=-1,lastRealTime=null;
+    progs.forEach(function(p,i){if(p.startedAt&&!p.isEstimated&&i<curIdx){lastRealIdx=i;lastRealTime=new Date(p.startedAt);}});
 
-    // 間にある未登録プログラムを予測時刻で自動登録
-    var estimated=estimateAll(progs);
+    // 間にある未登録プログラム数をカウント
+    var gapIdxs=[];
+    for(var i=lastRealIdx+1;i<curIdx;i++){if(!progs[i].startedAt)gapIdxs.push(i);}
+
     var autoCount=0;
-    var newProgs=progs.map(function(p,i){
-      // 最後の実績より後 かつ 今回の直前 かつ 未登録
-      if(i>lastRealIdx&&i<curIdx&&!p.startedAt){
-        var est=estimated[i]._est;
-        if(est&&est!=='--:--'){
-          var ed=new Date();var ep=est.split(':');ed.setHours(+ep[0],+ep[1],0,0);
-          autoCount++;
-          return Object.assign({},p,{status:'started',startedAt:ed.toISOString(),
-            operatorName:'（予測登録）',isEstimated:true});
-        }
-      }
-      // 今回登録するプログラム
-      if(p.id===pid){
-        return Object.assign({},p,{status:'started',startedAt:d.toISOString(),
-          operatorName:name,isEstimated:false});
-      }
-      return p;
+    var newProgs=progs.slice();
+
+    if(gapIdxs.length>0&&lastRealTime){
+      // 「最後の実績時刻」と「今回の登録時刻」を均等に分割
+      // 区間数 = gap件数 + 1（最後の実績→1件目→…→今回登録、の各区切り）
+      var totalMs=d.getTime()-lastRealTime.getTime();
+      var step=totalMs/(gapIdxs.length+1);
+      gapIdxs.forEach(function(idx,j){
+        var t=new Date(lastRealTime.getTime()+step*(j+1));
+        newProgs[idx]=Object.assign({},progs[idx],{
+          status:'started',startedAt:t.toISOString(),
+          operatorName:'（予測登録）',isEstimated:true
+        });
+        autoCount++;
+      });
+    }
+
+    // 今回登録するプログラム
+    newProgs[curIdx]=Object.assign({},progs[curIdx],{
+      status:'started',startedAt:d.toISOString(),
+      operatorName:name,isEstimated:false
     });
 
     upd({programs:newProgs});
-    if(autoCount>0)showSnackbar(autoCount+'件を予測時刻で自動登録しました');
+    if(autoCount>0)showSnackbar(autoCount+'件を均等割の予測時刻で自動登録しました');
   }
   function doCancel(pid){upd({programs:state.programs.map(function(p){return p.id===pid?Object.assign({},p,{status:'pending',startedAt:null,operatorName:null}):p;})});}
   function doEditTime(pid,newTime){
