@@ -1186,7 +1186,7 @@ function mountMain(initState, role, opKey, initialTab){
   var filterFeatured=false; // 注目イベントフィルタ
 
   function buildProgressTab(){
-    var ctrl=canEdit?el('div',{className:'ctrl-row'},[]):null;
+    var ctrl=el('div',{className:'ctrl-row'});
     if(canEdit){
       pauseBtn=el('button',{className:'btn btn-amber',style:{display:'inline-flex',alignItems:'center',gap:6,padding:'13px 20px',fontSize:'16px'}},'一時停止');
       emergBtn=el('button',{className:'btn btn-danger',style:{padding:'13px 20px',fontSize:'16px'}},'緊急停止');
@@ -1241,20 +1241,21 @@ function mountMain(initState, role, opKey, initialTab){
           });
         });
       };
-      // 注目フィルタボタン
-      var filterBtn=el('button',{className:'btn btn-gray',style:{marginLeft:'auto',fontSize:13,padding:'8px 14px'}},
-        '☆ 注目のみ表示');
-      filterBtn.onclick=function(){
-        filterFeatured=!filterFeatured;
-        filterBtn.textContent=filterFeatured?'★ 全て表示':'☆ 注目のみ表示';
-        filterBtn.style.background=filterFeatured?'#fef3c7':'';
-        filterBtn.style.color=filterFeatured?'#92400e':'';
-        filterBtn.style.borderColor=filterFeatured?'#f59e0b':'';
-        renderPrograms();
-      };
       ctrl.appendChild(pauseBtn);ctrl.appendChild(emergBtn);ctrl.appendChild(resetBtn);ctrl.appendChild(clearBtn);
-      ctrl.appendChild(filterBtn);
     }
+
+    // 注目フィルタボタン（全ロール共通）
+    var filterBtn=el('button',{className:'btn btn-gray',style:{marginLeft:'auto',fontSize:13,padding:'8px 14px'}},
+      '☆ 注目のみ表示');
+    filterBtn.onclick=function(){
+      filterFeatured=!filterFeatured;
+      filterBtn.textContent=filterFeatured?'★ 全て表示':'☆ 注目のみ表示';
+      filterBtn.style.background=filterFeatured?'#fef3c7':'';
+      filterBtn.style.color=filterFeatured?'#92400e':'';
+      filterBtn.style.borderColor=filterFeatured?'#f59e0b':'';
+      renderPrograms();
+    };
+    ctrl.appendChild(filterBtn);
 
     // 緊急停止バナー（進行エリア内）
     var emergMsg=canEdit
