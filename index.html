@@ -1115,12 +1115,25 @@ function mountMain(initState, role, opKey, initialTab){
         ]),
       ]),
       el('div',{className:'card'},[
-        el('div',{className:'section-title'},'実績エクスポート'),
+        el('div',{className:'section-title'},'実績エクスポート・履歴保存'),
         el('div',{style:{fontSize:12,color:'var(--ink3)',marginBottom:12,lineHeight:'1.7'}},[
           '予定時刻・実績開始時刻・差分をCSVで書き出します。',el('br'),
           '次回のプログラム編成にお役立てください。',
         ]),
         exportBtn,
+        (function(){
+          var hSaveBtn=el('button',{className:'btn btn-outline',style:{width:'100%',marginTop:8}},'📋 この内容を履歴として保存');
+          hSaveBtn.onclick=function(){
+            showConfirm('現在の進行状況を履歴として保存しますか？',function(){
+              hSaveBtn.disabled=true;hSaveBtn.textContent='保存中…';
+              saveHistory(state,function(){
+                hSaveBtn.disabled=false;hSaveBtn.textContent='📋 この内容を履歴として保存';
+                showSnackbar('✓ 履歴に保存しました');
+              });
+            });
+          };
+          return hSaveBtn;
+        })(),
       ]),
       el('div',{className:'card'},[
         el('div',{className:'csv-info'},[
@@ -1558,6 +1571,182 @@ function mountAdminSetup(){
 }
 
 // ── イベント一覧画面 ──
+// ══ 履歴機能 ══
+var HIST_LIST_KEY='evtm_history_list';
+var HIST_DB_PATH='history';
+
+function getHistoryList(){try{return JSON.parse(localStorage.getItem(HIST_LIST_KEY)||'[]');}catch(e){return[];}}
+function addHistoryMeta(meta){
+  var list=getHistoryList();
+  list.unshift(meta);
+  localStorage.setItem(HIST_LIST_KEY,JSON.stringify(list.slice(0,30)));
+}
+function removeHistoryMeta(histId){
+  localStorage.setItem(HIST_LIST_KEY,JSON.stringify(getHistoryList().filter(function(h){return h.histId!==histId;})));
+}
+
+// 現在のイベントを履歴として保存
+function saveHistory(state,onDone){
+  var histId=state.eventId+'_'+Date.now();
+  var snap={
+    histId:histId,eventId:state.eventId,eventName:state.eventName,
+    adminName:state.adminName,savedAt:new Date().toISOString(),
+    programs:toArray(state.programs)
+  };
+  _db.ref(HIST_DB_PATH+'/'+histId).set(snap,function(err){
+    if(err){showSnackbar('履歴保存エラー: '+err.message);return;}
+    addHistoryMeta({histId:histId,eventName:state.eventName,savedAt:snap.savedAt,eventId:state.eventId});
+    if(onDone)onDone();
+  });
+}
+
+// 履歴一覧画面
+function mountHistoryList(fromTab){
+  var list=getHistoryList();
+  var wrap=el('div',{style:{minHeight:'100vh',background:'var(--bg)',display:'flex',flexDirection:'column'}});
+  wrap.appendChild(el('div',{className:'appbar'},[
+    el('span',{className:'appbar-title'},'履歴'),
+    el('span',{className:'appbar-right'},fmtDate(new Date())),
+  ]));
+
+  var inner=el('div',{style:{flex:1,overflowY:'auto',maxWidth:560,margin:'0 auto',width:'100%',paddingBottom:'32px'}});
+
+  var backBtn=el('button',{className:'btn btn-gray',style:{margin:'16px 18px 0',width:'calc(100% - 36px)'}},'← イベント一覧に戻る');
+  backBtn.onclick=function(){mountEventList();};
+  inner.appendChild(backBtn);
+
+  inner.appendChild(el('div',{className:'section-label'},'保存済みの履歴'));
+
+  if(list.length===0){
+    inner.appendChild(el('div',{style:{padding:'32px 18px',color:'var(--ink3)',fontSize:14,textAlign:'center'}},'履歴はまだありません'));
+  }
+
+  list.forEach(function(h){
+    var row=el('div',{style:{display:'flex',alignItems:'center',gap:12,padding:'14px 18px',borderBottom:'1px solid var(--rule)',background:'white',cursor:'pointer'}});
+    var info=el('div',{style:{flex:1,minWidth:0}});
+    var dateStr=h.savedAt?new Date(h.savedAt).toLocaleDateString('ja-JP',{year:'numeric',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+    info.appendChild(el('div',{style:{fontSize:16,fontWeight:700,color:'var(--ink)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},h.eventName||'（無題）'));
+    info.appendChild(el('div',{style:{fontSize:11,color:'var(--ink3)',marginTop:3,fontFamily:'var(--mono)'}},dateStr));
+    var delBtn=el('button',{style:{background:'none',border:'none',color:'var(--ink3)',fontSize:18,cursor:'pointer',padding:'4px 8px',flexShrink:0}},'×');
+    delBtn.onclick=function(e){
+      e.stopPropagation();
+      showConfirm('この履歴を削除しますか？',function(){
+        _db.ref(HIST_DB_PATH+'/'+h.histId).remove();
+        removeHistoryMeta(h.histId);
+        mountHistoryList();
+      });
+    };
+    row.onclick=function(){mountHistoryDetail(h.histId,h.eventName);};
+    row.appendChild(info);row.appendChild(delBtn);
+    inner.appendChild(row);
+  });
+
+  wrap.appendChild(inner);render(wrap);
+}
+
+// 履歴詳細画面（読み取り専用）
+function mountHistoryDetail(histId,eventName){
+  // ローディング
+  var spin=el('div',{style:{minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:14,background:'var(--bg)'}});
+  spin.appendChild(el('div',{className:'spinner'}));
+  spin.appendChild(el('div',{style:{fontSize:14,fontWeight:700,color:'var(--ink2)'}},'履歴を読み込み中…'));
+  render(spin);
+
+  _db.ref(HIST_DB_PATH+'/'+histId).once('value',function(snap){
+    var data=snap.val();
+    if(!data){showSnackbar('履歴が見つかりません');mountHistoryList();return;}
+    var progs=toArray(data.programs);
+    var savedStr=data.savedAt?new Date(data.savedAt).toLocaleDateString('ja-JP',{year:'numeric',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+
+    var wrap=el('div',{style:{minHeight:'100vh',background:'var(--bg)',display:'flex',flexDirection:'column'}});
+    wrap.appendChild(el('div',{className:'appbar'},[
+      el('span',{className:'appbar-title',style:{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},data.eventName||'履歴'),
+      el('span',{className:'appbar-right'},fmtDate(new Date())),
+    ]));
+
+    var inner=el('div',{style:{flex:1,overflowY:'auto',maxWidth:560,margin:'0 auto',width:'100%',paddingBottom:'32px'}});
+
+    // 戻るボタン
+    var backBtn=el('button',{className:'btn btn-gray',style:{margin:'16px 18px 0',width:'calc(100% - 36px)'}},'← 履歴一覧に戻る');
+    backBtn.onclick=function(){mountHistoryList();};
+    inner.appendChild(backBtn);
+
+    // 保存情報
+    inner.appendChild(el('div',{className:'card',style:{margin:'12px 18px 0'}},[
+      el('div',{style:{fontSize:13,color:'var(--ink3)'}},'保存日時: '+savedStr),
+      el('div',{style:{fontSize:13,color:'var(--ink3)',marginTop:4}},'担当: '+(data.adminName||'—')),
+    ]));
+
+    // CSVエクスポート
+    var csvBtn=el('button',{className:'btn btn-primary',style:{margin:'8px 18px',width:'calc(100% - 36px)'}}, '📊 このイベントの実績CSVを出力');
+    csvBtn.onclick=function(){exportHistoryCsv(data);};
+    inner.appendChild(csvBtn);
+
+    inner.appendChild(el('div',{className:'section-label'},'プログラム一覧（'+progs.length+'件）'));
+
+    // プログラム一覧（読み取り専用）
+    progs.forEach(function(p){
+      var isDone=!!p.startedAt;
+      var row=el('div',{style:{
+        display:'flex',alignItems:'center',gap:12,padding:'12px 18px',
+        borderBottom:'1px solid var(--rule)',
+        background:isDone?(p.isEstimated?'repeating-linear-gradient(135deg,#f7f7f7 0px,#f7f7f7 6px,#fafafa 6px,#fafafa 12px)':'#f7fdf6'):'white'
+      }});
+
+      // 状態ドット
+      var dot=el('div',{style:{width:8,height:8,borderRadius:'50%',flexShrink:0,
+        background:isDone?(p.isEstimated?'#aaa':'#3a7'):'var(--rule)',marginTop:2}});
+
+      var info=el('div',{style:{flex:1,minWidth:0}});
+      info.appendChild(el('div',{style:{fontSize:11,color:'var(--ink3)',fontFamily:'var(--mono)'}},(p.scheduledTime||'--:--')));
+      var nameRow=el('div',{style:{display:'flex',alignItems:'center',gap:6}});
+      nameRow.appendChild(el('span',{style:{fontSize:17,fontWeight:isDone?700:400,color:isDone?'var(--ink)':'var(--ink3)',textDecoration:p.isEstimated?'line-through':'none'}},p.program||''));
+      if(p.isEstimated)nameRow.appendChild(el('span',{style:{fontSize:10,color:'var(--accent)',border:'1px solid var(--accent)',borderRadius:4,padding:'1px 4px'}},'予測'));
+      info.appendChild(nameRow);
+      if(p.target)info.appendChild(el('div',{style:{fontSize:11,color:'var(--ink3)'}},p.target));
+
+      // 右：実績時刻
+      var right=el('div',{style:{textAlign:'right',flexShrink:0}});
+      if(isDone){
+        right.appendChild(el('div',{style:{fontSize:11,color:'var(--ink3)'}},'開始'));
+        right.appendChild(el('div',{style:{fontSize:20,fontWeight:700,fontFamily:'var(--mono)',color:p.isEstimated?'#aaa':'var(--ink)'}},fmtISO(p.startedAt)||'--:--'));
+        if(p.scheduledTime){
+          var diff=Math.round((parseTimeToMs(fmtISO(p.startedAt))-parseTimeToMs(p.scheduledTime))/60000);
+          if(!isNaN(diff)&&diff!==0){
+            right.appendChild(el('span',{style:{fontSize:11,color:diff>0?'var(--accent)':'#3a7',fontFamily:'var(--mono)'}},(diff>0?'+':'')+diff+'分'));
+          }
+        }
+      }
+
+      row.appendChild(dot);row.appendChild(info);row.appendChild(right);
+      inner.appendChild(row);
+    });
+
+    wrap.appendChild(inner);render(wrap);
+  });
+}
+
+// 履歴からCSVエクスポート
+function exportHistoryCsv(data){
+  function parseMs(t){if(!t)return 0;var p=t.split(':');return(+p[0])*3600000+(+p[1])*60000;}
+  var progs=toArray(data.programs);
+  var lines=['\uFEFF'+'プログラム,対象,予定時刻,実績開始時刻,差分(分),担当者,登録種別'];
+  progs.forEach(function(p){
+    var actual=p.startedAt?fmtISO(p.startedAt):'';
+    var diff='';
+    if(p.startedAt&&p.scheduledTime){var dMs=parseMs(fmtISO(p.startedAt))-parseMs(p.scheduledTime);if(!isNaN(dMs))diff=Math.round(dMs/60000);}
+    lines.push([p.program||'',p.target||'',p.scheduledTime||'',actual,diff,p.isEstimated?'（予測登録）':(p.operatorName||''),!p.startedAt?'未登録':p.isEstimated?'予測':'実績'].join(','));
+  });
+  var blob=new Blob([lines.join('\n')],{type:'text/csv;charset=utf-8'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=(data.eventName||'event')+'_'+new Date(data.savedAt).toLocaleDateString('ja-JP').replace(/\//g,'-')+'_実績.csv';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
+  showSnackbar('CSVをダウンロードしました');
+}
+
+
 function mountEventList(){
   clearTimers();
   var list=getEventsList();
@@ -1602,9 +1791,12 @@ function mountEventList(){
     inner.appendChild(row);
   });
 
-  var newBtn=el('button',{className:'btn btn-primary',style:{margin:'20px 18px',width:'calc(100% - 36px)',padding:'14px',fontSize:15}},'＋ 新規イベントを作成');
+  var newBtn=el('button',{className:'btn btn-primary',style:{margin:'20px 18px 8px',width:'calc(100% - 36px)',padding:'14px',fontSize:15}},'＋ 新規イベントを作成');
   newBtn.onclick=function(){showSetupForm(null);};
   inner.appendChild(newBtn);
+  var histBtn=el('button',{className:'btn btn-gray',style:{margin:'0 18px 8px',width:'calc(100% - 36px)',padding:'12px',fontSize:14}},'📋 履歴を見る');
+  histBtn.onclick=function(){mountHistoryList();};
+  inner.appendChild(histBtn);
 
   var recCard=el('div',{className:'card',style:{margin:'0 18px 16px'}});
   recCard.appendChild(el('div',{className:'section-title'},'イベント復帰（ID入力）'));
