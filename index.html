@@ -268,7 +268,19 @@ function csvParse(text){
   // 1行目はヘッダー行としてスキップ
   return lines.slice(1).map(function(line){
     var cols=line.split(',').map(function(s){return s.trim().replace(/^"|"$/g,'');});
-    return{id:uid(),scheduledTime:cols[0]||'',target:cols[1]||'',program:cols.slice(2).join(',').trim(),status:'pending',startedAt:null,operatorName:null};
+    // 列構成: 時刻, 対象, プログラム[, 注目イベントメモ]
+    // ※プログラム名自体にカンマが入る場合を考慮し、最後の列を注目メモとして扱う
+    var noteCol=cols.length>=4?cols[cols.length-1]:'';
+    var progCols=cols.length>=4?cols.slice(2,cols.length-1):cols.slice(2);
+    var prog=progCols.join(',').trim();
+    var isFeatured=!!noteCol;
+    return{
+      id:uid(),scheduledTime:cols[0]||'',target:cols[1]||'',program:prog,
+      status:'pending',startedAt:null,operatorName:null,
+      isFeatured:isFeatured,
+      featuredNote:isFeatured?noteCol:'',
+      featuredAt:isFeatured?new Date().toISOString():null
+    };
   }).filter(function(p){return p.program||p.target;});
 }
 // 文字コード自動判定（UTF-8 → Shift-JIS フォールバック）
@@ -1063,7 +1075,8 @@ function mountMain(initState, role, opKey, initialTab){
           actual,
           diff,
           p.isEstimated?'（予測登録）':(p.operatorName||''),
-          kind
+          kind,
+          p.isFeatured?(p.featuredNote||'★'):''
         ].join(','));
       });
 
@@ -1144,7 +1157,7 @@ function mountMain(initState, role, opKey, initialTab){
         el('div',{className:'csv-info'},[
           el('b',null,'CSVの形式'),el('br'),
           '1行目：ヘッダー行（自動スキップ）',el('br'),
-          '2行目以降：時刻,対象,プログラム名（例）',el('br'),
+          '2行目以降：時刻,対象,プログラム名[,注目メモ]（例）',el('br'),
           '08:20,全校,開会式',el('br'),'08:30,全校,準備運動',el('br'),
           '08:40,全校,応援合戦',el('br'),'08:50,中学年,団体競技',
           el('br'),el('span',{style:{color:'#2e7d32',fontSize:11}},'※ UTF-8 / Shift-JIS 両対応'),
@@ -2000,7 +2013,13 @@ function showSetupForm(savedData){
     el('div',{style:{marginTop:14}},[el('div',{className:'field-label'},'イベントID'),el('div',{style:{fontFamily:'monospace',fontSize:13,color:'#5b4fcf',background:'#f0eef8',borderRadius:8,padding:'6px 10px',marginTop:4}},eventId)]),
   ]));
   inner.appendChild(el('div',{className:'card'},[
-    el('div',{className:'csv-info'},[el('b',null,'CSVの形式'),el('br'),'ヘッダ行 必須：時刻,対象,プログラム（例）',el('br'),'08:20,全校,開会式',el('br'),'08:30,全校,準備運動']),
+    el('div',{className:'csv-info'},[
+          el('b',null,'CSVの形式'),el('br'),
+          '列構成：時刻,対象,プログラム[,注目メモ]',el('br'),
+          '例）08:20,全校,開会式,,',el('br'),
+          '例）09:45,3部,3-A-1,決勝進出者注目！',el('br'),
+          el('span',{style:{color:'#2e7d32',fontSize:11}},'※ 4列目に文字があると注目イベントに自動登録されます'),
+        ]),
   ]));
   inner.appendChild(el('div',{className:'card'},[goBtn,goMsg]));
   inner.appendChild(el('div',{style:{padding:'0 0 8px'}},[backBtn]));
