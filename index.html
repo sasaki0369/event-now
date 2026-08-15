@@ -87,6 +87,8 @@ input:focus,textarea:focus{outline:none}
 .prog-header{padding:16px 18px 0;display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:6px}
 .prog-title{font-size:16px;font-weight:700;color:var(--ink);letter-spacing:.03em}
 .ctrl-row{display:flex;gap:8px;flex-wrap:wrap;padding:12px 18px 10px;border-bottom:1px solid var(--rule)}
+.tab-filter-btn{display:flex;align-items:center;gap:4px;margin-left:auto;padding:0 14px;font-size:12px;font-weight:700;cursor:pointer;color:var(--ink3);background:none;border:none;border-left:1px solid var(--rule);font-family:var(--sans);white-space:nowrap;height:100%}
+.tab-filter-btn.on{color:#92400e;background:#fef3c7}
 
 /* ── Section label ── */
 .section-label{padding:16px 18px 6px;font-size:12px;color:var(--ink3);letter-spacing:.12em;text-transform:uppercase;border-bottom:1px solid var(--rule);scroll-margin-top:140px}
@@ -901,7 +903,18 @@ function mountMain(initState, role, opKey, initialTab){
   var tabSetup=el('div',{className:'tab'},[ svgIcon('setup'),' 準備']);
   var tabProg=el('div',{className:'tab'},[ svgIcon('list'),' 進行']);
   if(role==='admin'){tabs.appendChild(tabSetup);tabs.appendChild(tabProg);}
-  else{tabs.appendChild(tabProg);}
+  else{
+    tabs.appendChild(tabProg);
+    // 閲覧者・オペレータのみ：タブバー右端にフィルタボタン（スクロール外固定）
+    var tabFilterBtn=el('button',{className:'tab-filter-btn'},'☆ 注目');
+    tabFilterBtn.onclick=function(){
+      filterFeatured=!filterFeatured;
+      tabFilterBtn.textContent=filterFeatured?'★ 注目':'☆ 注目';
+      tabFilterBtn.className='tab-filter-btn'+(filterFeatured?' on':'');
+      _doFilterRender();
+    };
+    tabs.appendChild(tabFilterBtn);
+  }
   root.appendChild(tabs);
 
   // status bar - ステータスドット＋テキストのみ
@@ -1092,8 +1105,21 @@ function mountMain(initState, role, opKey, initialTab){
     setupTabEl=el('div',null,[
       el('div',{className:'card'},[
         el('div',{className:'section-title'},'イベント設定'),
-        el('div',{style:{marginBottom:12}},[el('div',{className:'field-label'},'イベント名（必須）'),
-          el('input',{className:'field-inp',id:'setup-eventname-inp',type:'text',value:state.eventName,readOnly:true,style:{background:'#f8f7ff',borderRadius:'8px 8px 0 0'}}),
+        el('div',{style:{marginBottom:12}},[
+          el('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}},[
+            el('div',{className:'field-label'},'イベント名（必須）'),
+          ]),
+          (function(){
+            var inp=el('input',{className:'field-inp',id:'setup-eventname-inp',type:'text',value:state.eventName,style:{background:'#f8f7ff',borderRadius:'8px 8px 0 0'}});
+            inp.oninput=function(){
+              var newName=inp.value;
+              upd({eventName:newName});
+              // イベント一覧のメタデータも即時更新
+              saveEventToList({eventId:state.eventId,opKey:state.opKey,eventName:newName||'（無題）',adminName:state.adminName});
+              applyEventName(newName);
+            };
+            return inp;
+          })(),
         ]),
         el('div',null,[el('div',{className:'field-label'},'あなたの名前'),
           el('input',{className:'field-inp',type:'text',value:state.adminName||'',readOnly:true,style:{background:'#f8f7ff',borderRadius:'8px 8px 0 0'}}),
@@ -1168,6 +1194,12 @@ function mountMain(initState, role, opKey, initialTab){
         el('div',{className:'recovery-row'},[recInp,recBtn]),
         el('div',{style:{fontSize:10,color:'#94a3b8',marginTop:6}},'Event ID: '+state.eventId),
       ]),
+      // イベント一覧へ戻るボタン
+      (function(){
+        var listBtn=el('button',{className:'btn btn-gray',style:{margin:'4px 0 16px',width:'100%',padding:'12px',fontSize:14}},'← イベント一覧に戻る');
+        listBtn.onclick=function(){clearTimers();mountEventList();};
+        return el('div',{style:{padding:'0'}},listBtn);
+      })(),
     ]);
     return setupTabEl;
   }
@@ -1184,6 +1216,7 @@ function mountMain(initState, role, opKey, initialTab){
   var progList=null;
   var pauseBtn=null,emergBtn=null,resetBtn=null,emergBanner=null,clearBtn=null;
   var filterFeatured=false; // 注目イベントフィルタ
+  var _doFilterRender=function(){}; // renderProgramsへの外部参照
 
   function buildProgressTab(){
     var ctrl=el('div',{className:'ctrl-row'});
@@ -1244,18 +1277,20 @@ function mountMain(initState, role, opKey, initialTab){
       ctrl.appendChild(pauseBtn);ctrl.appendChild(emergBtn);ctrl.appendChild(resetBtn);ctrl.appendChild(clearBtn);
     }
 
-    // 注目フィルタボタン（全ロール共通）
-    var filterBtn=el('button',{className:'btn btn-gray',style:{marginLeft:'auto',fontSize:13,padding:'8px 14px'}},
-      '☆ 注目のみ表示');
-    filterBtn.onclick=function(){
-      filterFeatured=!filterFeatured;
-      filterBtn.textContent=filterFeatured?'★ 全て表示':'☆ 注目のみ表示';
-      filterBtn.style.background=filterFeatured?'#fef3c7':'';
-      filterBtn.style.color=filterFeatured?'#92400e':'';
-      filterBtn.style.borderColor=filterFeatured?'#f59e0b':'';
-      renderPrograms();
-    };
-    ctrl.appendChild(filterBtn);
+    // 管理者のみ：ctrl-row内にフィルタボタンを追加
+    if(canEdit){
+      var filterBtn=el('button',{className:'btn btn-gray',style:{marginLeft:'auto',fontSize:13,padding:'8px 14px'}},
+        '☆ 注目のみ表示');
+      filterBtn.onclick=function(){
+        filterFeatured=!filterFeatured;
+        filterBtn.textContent=filterFeatured?'★ 全て表示':'☆ 注目のみ表示';
+        filterBtn.style.background=filterFeatured?'#fef3c7':'';
+        filterBtn.style.color=filterFeatured?'#92400e':'';
+        filterBtn.style.borderColor=filterFeatured?'#f59e0b':'';
+        renderPrograms();
+      };
+      ctrl.appendChild(filterBtn);
+    }
 
     // 緊急停止バナー（進行エリア内）
     var emergMsg=canEdit
@@ -1359,6 +1394,7 @@ function mountMain(initState, role, opKey, initialTab){
   }
 
   function renderPrograms(){
+    _doFilterRender=renderPrograms; // 外部から呼べるように参照を更新
     if(!progList)return;
     progList.innerHTML='';
     var progs=estimateAll(state.programs||[]);
