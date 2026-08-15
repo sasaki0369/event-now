@@ -1347,8 +1347,16 @@ function mountMain(initState, role, opKey, initialTab){
     var cancelBtn=el('button',{className:'btn btn-gray',style:{flex:1}},p.isFeatured?'解除する':'キャンセル');
     var okBtn=el('button',{className:'btn btn-primary',style:{flex:1}},'登録する');
     cancelBtn.onclick=function(){
-      document.body.removeChild(bg);
-      if(p.isFeatured)doFeatured(p.id,'',false); // 解除する
+      if(p.isFeatured){
+        // 解除する → 確認ダイアログ
+        showConfirm('注目イベントの登録を解除しますか？\nメモも削除されます。',function(){
+          document.body.removeChild(bg);
+          doFeatured(p.id,'',false);
+        });
+      } else {
+        // 未登録のキャンセル → そのまま閉じる
+        document.body.removeChild(bg);
+      }
     };
     okBtn.onclick=function(){
       document.body.removeChild(bg);
@@ -1393,7 +1401,12 @@ function mountMain(initState, role, opKey, initialTab){
       var editBtn=el('button',{className:'btn btn-outline',style:{flex:1}},'編集');
       editBtn.onclick=function(){document.body.removeChild(bg);showFeaturedRegister(p);};
       var unregBtn=el('button',{style:{flex:1,background:'none',border:'1px solid var(--rule)',borderRadius:4,color:'var(--ink3)',cursor:'pointer',padding:'12px 8px',fontSize:13}},'★解除');
-      unregBtn.onclick=function(){document.body.removeChild(bg);doFeatured(p.id,'',false);};
+      unregBtn.onclick=function(){
+        showConfirm('注目イベントの登録を解除しますか？\nメモも削除されます。',function(){
+          document.body.removeChild(bg);
+          doFeatured(p.id,'',false);
+        });
+      };
       row.appendChild(editBtn);row.appendChild(unregBtn);
     }
     modal.appendChild(row);
