@@ -1574,18 +1574,19 @@ function mountAdminSetup(){
 // ══ 履歴機能 ══
 var HIST_LIST_KEY='evtm_history_list';
 var HIST_DB_PATH='history';
+var HIST_MAX=30;
 
 function getHistoryList(){try{return JSON.parse(localStorage.getItem(HIST_LIST_KEY)||'[]');}catch(e){return[];}}
 function addHistoryMeta(meta){
   var list=getHistoryList();
   list.unshift(meta);
-  localStorage.setItem(HIST_LIST_KEY,JSON.stringify(list.slice(0,30)));
+  localStorage.setItem(HIST_LIST_KEY,JSON.stringify(list.slice(0,HIST_MAX)));
 }
 function removeHistoryMeta(histId){
   localStorage.setItem(HIST_LIST_KEY,JSON.stringify(getHistoryList().filter(function(h){return h.histId!==histId;})));
 }
 
-// 現在のイベントを履歴として保存
+// 現在のイベントをFirebaseに履歴として保存
 function saveHistory(state,onDone){
   var histId=state.eventId+'_'+Date.now();
   var snap={
@@ -1594,10 +1595,17 @@ function saveHistory(state,onDone){
     programs:toArray(state.programs)
   };
   _db.ref(HIST_DB_PATH+'/'+histId).set(snap,function(err){
-    if(err){showSnackbar('履歴保存エラー: '+err.message);return;}
+    if(err){showSnackbar('保存エラー: '+err.message);if(onDone)onDone(err);return;}
     addHistoryMeta({histId:histId,eventName:state.eventName,savedAt:snap.savedAt,eventId:state.eventId});
-    if(onDone)onDone();
+    if(onDone)onDone(null);
   });
+}
+
+// Firebase から履歴データを取得
+function loadHistory(histId,callback){
+  _db.ref(HIST_DB_PATH+'/'+histId).once('value',function(snap){
+    callback(snap.val());
+  },function(err){callback(null);});
 }
 
 // 履歴一覧画面
@@ -1646,14 +1654,12 @@ function mountHistoryList(fromTab){
 
 // 履歴詳細画面（読み取り専用）
 function mountHistoryDetail(histId,eventName){
-  // ローディング
   var spin=el('div',{style:{minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:14,background:'var(--bg)'}});
   spin.appendChild(el('div',{className:'spinner'}));
   spin.appendChild(el('div',{style:{fontSize:14,fontWeight:700,color:'var(--ink2)'}},'履歴を読み込み中…'));
   render(spin);
 
-  _db.ref(HIST_DB_PATH+'/'+histId).once('value',function(snap){
-    var data=snap.val();
+  loadHistory(histId,function(data){
     if(!data){showSnackbar('履歴が見つかりません');mountHistoryList();return;}
     var progs=toArray(data.programs);
     var savedStr=data.savedAt?new Date(data.savedAt).toLocaleDateString('ja-JP',{year:'numeric',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'';
