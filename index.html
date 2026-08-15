@@ -99,6 +99,11 @@ input:focus,textarea:focus{outline:none}
 .prog-row.next-row{background:white}
 .prog-row.next-row::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
 .prog-row.next-row .prog-name{font-weight:700}
+.prog-row.featured-row{background:linear-gradient(135deg,#fffbeb,#fef3c7);border-left:4px solid #f59e0b}
+.prog-row.featured-row .prog-name{color:#92400e}
+.featured-star{font-size:18px;color:#d1d5db;cursor:pointer;padding:4px;border:none;background:none;flex-shrink:0;line-height:1}
+.featured-star.on{color:#f59e0b}
+.featured-badge{display:inline-flex;align-items:center;gap:3px;font-size:10px;color:#92400e;background:#fde68a;border-radius:4px;padding:1px 5px;font-weight:700;margin-top:2px}
 
 /* ── Row ボタン列 ── */
 .prog-btn-col{display:flex;align-items:center;justify-content:center;flex-shrink:0}
@@ -1248,6 +1253,80 @@ function mountMain(initState, role, opKey, initialTab){
     return progTabEl;
   }
 
+  // ── 注目イベントの登録・更新 ──
+  function doFeatured(pid, note){
+    upd({programs:toArray(state.programs).map(function(p){
+      if(p.id!==pid)return p;
+      var nowFeatured=!p.isFeatured;
+      return Object.assign({},p,{isFeatured:nowFeatured,featuredNote:nowFeatured?(note||''):'',featuredAt:nowFeatured?new Date().toISOString():null});
+    })});
+  }
+
+  // ── 注目イベント登録モーダル ──
+  function showFeaturedRegister(p){
+    var bg=el('div',{className:'modal-bg center',style:{zIndex:200}});
+    var modal=el('div',{className:'modal center-modal',style:{padding:'24px',maxWidth:360}});
+    modal.appendChild(el('div',{style:{fontSize:18,fontWeight:700,color:'var(--ink)',marginBottom:4}},'★ 注目イベントに登録'));
+    modal.appendChild(el('div',{style:{fontSize:14,color:'var(--accent)',marginBottom:12}},p.program));
+    modal.appendChild(el('div',{style:{fontSize:12,color:'var(--ink3)',marginBottom:6}},'メモ（任意）'));
+    var noteInp=el('textarea',{style:{width:'100%',border:'1px solid var(--rule)',borderRadius:8,padding:'10px',fontSize:14,fontFamily:'var(--sans)',resize:'none',boxSizing:'border-box',minHeight:'72px'},placeholder:'観客への案内文やアナウンス内容など'});
+    noteInp.value=p.featuredNote||'';
+    modal.appendChild(noteInp);
+    var row=el('div',{style:{display:'flex',gap:8,marginTop:16}});
+    var cancelBtn=el('button',{className:'btn btn-gray',style:{flex:1}},p.isFeatured?'解除する':'キャンセル');
+    var okBtn=el('button',{className:'btn btn-primary',style:{flex:1}},'登録する');
+    cancelBtn.onclick=function(){
+      document.body.removeChild(bg);
+      if(p.isFeatured)doFeatured(p.id,'');
+    };
+    okBtn.onclick=function(){document.body.removeChild(bg);doFeatured(p.id,noteInp.value.trim());};
+    row.appendChild(cancelBtn);row.appendChild(okBtn);
+    modal.appendChild(row);
+    bg.appendChild(modal);document.body.appendChild(bg);
+  }
+
+  // ── 注目イベント詳細モーダル ──
+  function showFeaturedDetail(p){
+    var bg=el('div',{className:'modal-bg center',style:{zIndex:200}});
+    var modal=el('div',{className:'modal center-modal',style:{padding:'24px',maxWidth:360}});
+    // ヘッダー
+    var hdr=el('div',{style:{display:'flex',alignItems:'center',gap:8,marginBottom:12}});
+    hdr.appendChild(el('span',{style:{fontSize:22,color:'#f59e0b'}},'★'));
+    hdr.appendChild(el('span',{style:{fontSize:18,fontWeight:800,color:'#92400e'}},p.program));
+    modal.appendChild(hdr);
+    // 詳細情報
+    var info=el('div',{style:{background:'#fffbeb',borderRadius:10,padding:'12px',marginBottom:12}});
+    info.appendChild(el('div',{style:{fontSize:12,color:'var(--ink3)',marginBottom:4}},'対象'));
+    info.appendChild(el('div',{style:{fontSize:15,fontWeight:600,color:'var(--ink)',marginBottom:10}},p.target||'—'));
+    info.appendChild(el('div',{style:{fontSize:12,color:'var(--ink3)',marginBottom:4}},'予定時刻'));
+    info.appendChild(el('div',{style:{fontFamily:'var(--mono)',fontSize:20,fontWeight:700,color:'var(--ink)',marginBottom:10}},p.scheduledTime||'—'));
+    if(p.startedAt){
+      info.appendChild(el('div',{style:{fontSize:12,color:'var(--ink3)',marginBottom:4}},'開始時刻（実績）'));
+      info.appendChild(el('div',{style:{fontFamily:'var(--mono)',fontSize:20,fontWeight:700,color:'#2e7d32',marginBottom:4}},fmtISO(p.startedAt)));
+    }
+    modal.appendChild(info);
+    // メモ
+    if(p.featuredNote){
+      modal.appendChild(el('div',{style:{fontSize:12,color:'var(--ink3)',marginBottom:4}},'メモ'));
+      modal.appendChild(el('div',{style:{fontSize:14,color:'var(--ink)',lineHeight:'1.7',background:'white',border:'1px solid var(--rule)',borderRadius:8,padding:'10px',whiteSpace:'pre-wrap',marginBottom:12}},p.featuredNote));
+    }
+    // アクション
+    var row=el('div',{style:{display:'flex',gap:8}});
+    var closeBtn=el('button',{className:'btn btn-gray',style:{flex:1}},'閉じる');
+    closeBtn.onclick=function(){document.body.removeChild(bg);};
+    row.appendChild(closeBtn);
+    if(canEdit){
+      var editBtn=el('button',{className:'btn btn-outline',style:{flex:1}},'編集');
+      editBtn.onclick=function(){document.body.removeChild(bg);showFeaturedRegister(p);};
+      var unregBtn=el('button',{style:{flex:1,background:'none',border:'1px solid var(--rule)',borderRadius:4,color:'var(--ink3)',cursor:'pointer',padding:'12px 8px',fontSize:13}},'★解除');
+      unregBtn.onclick=function(){document.body.removeChild(bg);doFeatured(p.id,'');};
+      row.appendChild(editBtn);row.appendChild(unregBtn);
+    }
+    modal.appendChild(row);
+    bg.onclick=function(e){if(e.target===bg&&document.body.contains(bg))document.body.removeChild(bg);};
+    bg.appendChild(modal);document.body.appendChild(bg);
+  }
+
   function renderPrograms(){
     if(!progList)return;
     progList.innerHTML='';
@@ -1281,7 +1360,15 @@ function mountMain(initState, role, opKey, initialTab){
       }
 
       var rowCls='prog-row '+(isDone?(p.isEstimated?'done-row estimated-row':'done-row'):isNext?'next-row':'');
-      var row=el('div',{className:rowCls.trim()});
+      if(p.isFeatured)rowCls+=' featured-row';
+      var row=el('div',{className:rowCls.trim(),style:{cursor:p.isFeatured?'pointer':''}});
+      // 注目イベントはタップで詳細モーダルを表示
+      if(p.isFeatured){
+        row.onclick=function(e){
+          if(e.target.classList&&e.target.classList.contains('featured-star'))return;
+          showFeaturedDetail(p);
+        };
+      }
 
       // ── 左列：ボタン ──
       var leftCol=el('div',{className:'prog-btn-col'});
@@ -1305,6 +1392,13 @@ function mountMain(initState, role, opKey, initialTab){
       info.appendChild(el('div',{className:'prog-sched'},p.scheduledTime||'--:--'));
       info.appendChild(el('div',{className:'prog-name'},p.program));
       if(p.target)info.appendChild(el('div',{className:'prog-target'},p.target));
+      // 注目バッジ
+      if(p.isFeatured){
+        var fbRow=el('div',{style:{display:'flex',alignItems:'center',gap:6,marginTop:3}});
+        fbRow.appendChild(el('span',{className:'featured-badge'},'★ 注目'));
+        if(p.featuredNote)fbRow.appendChild(el('span',{style:{fontSize:11,color:'#92400e',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:'120px'}},p.featuredNote));
+        info.appendChild(fbRow);
+      }
       if(isDone&&p.startedAt){
         var metaStr=fmtISO(p.startedAt);
         if(p.isEstimated){
@@ -1353,6 +1447,14 @@ function mountMain(initState, role, opKey, initialTab){
       row.appendChild(leftCol);
       row.appendChild(info);
       row.appendChild(right);
+      // ★ 注目登録ボタン（管理者・オペレータのみ）
+      if(canEdit){
+        var starBtn=el('button',{className:'featured-star '+(p.isFeatured?'on':'')});
+        starBtn.textContent=p.isFeatured?'★':'☆';
+        starBtn.title=p.isFeatured?'注目イベント登録済み（タップで編集/解除）':'注目イベントに登録';
+        (function(prog){starBtn.onclick=function(e){e.stopPropagation();showFeaturedRegister(prog);};})(p);
+        row.appendChild(starBtn);
+      }
       progList.appendChild(row);
     });
   }
