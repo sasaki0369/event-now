@@ -1324,10 +1324,11 @@ function mountMain(initState, role, opKey, initialTab){
   }
 
   // ── 注目イベントの登録・更新 ──
-  function doFeatured(pid, note){
+  // isFeatured: true=登録, false=解除, undefined=トグル（後方互換）
+  function doFeatured(pid, note, isFeatured){
     upd({programs:toArray(state.programs).map(function(p){
       if(p.id!==pid)return p;
-      var nowFeatured=!p.isFeatured;
+      var nowFeatured=(isFeatured!==undefined)?isFeatured:!p.isFeatured;
       return Object.assign({},p,{isFeatured:nowFeatured,featuredNote:nowFeatured?(note||''):'',featuredAt:nowFeatured?new Date().toISOString():null});
     })});
   }
@@ -1347,9 +1348,12 @@ function mountMain(initState, role, opKey, initialTab){
     var okBtn=el('button',{className:'btn btn-primary',style:{flex:1}},'登録する');
     cancelBtn.onclick=function(){
       document.body.removeChild(bg);
-      if(p.isFeatured)doFeatured(p.id,'');
+      if(p.isFeatured)doFeatured(p.id,'',false); // 解除する
     };
-    okBtn.onclick=function(){document.body.removeChild(bg);doFeatured(p.id,noteInp.value.trim());};
+    okBtn.onclick=function(){
+      document.body.removeChild(bg);
+      doFeatured(p.id,noteInp.value.trim(),true); // 常にtrue（登録/更新）
+    };
     row.appendChild(cancelBtn);row.appendChild(okBtn);
     modal.appendChild(row);
     bg.appendChild(modal);document.body.appendChild(bg);
@@ -1389,7 +1393,7 @@ function mountMain(initState, role, opKey, initialTab){
       var editBtn=el('button',{className:'btn btn-outline',style:{flex:1}},'編集');
       editBtn.onclick=function(){document.body.removeChild(bg);showFeaturedRegister(p);};
       var unregBtn=el('button',{style:{flex:1,background:'none',border:'1px solid var(--rule)',borderRadius:4,color:'var(--ink3)',cursor:'pointer',padding:'12px 8px',fontSize:13}},'★解除');
-      unregBtn.onclick=function(){document.body.removeChild(bg);doFeatured(p.id,'');};
+      unregBtn.onclick=function(){document.body.removeChild(bg);doFeatured(p.id,'',false);};
       row.appendChild(editBtn);row.appendChild(unregBtn);
     }
     modal.appendChild(row);
