@@ -906,15 +906,7 @@ function mountMain(initState, role, opKey, initialTab){
   if(role==='admin'){tabs.appendChild(tabSetup);tabs.appendChild(tabProg);}
   else{
     tabs.appendChild(tabProg);
-    // 閲覧者・オペレータのみ：タブバー右端にフィルタボタン（スクロール外固定）
-    var tabFilterBtn=el('button',{className:'tab-filter-btn'},'☆ 注目');
-    tabFilterBtn.onclick=function(){
-      filterFeatured=!filterFeatured;
-      tabFilterBtn.textContent=filterFeatured?'★ 注目':'☆ 注目';
-      tabFilterBtn.className='tab-filter-btn'+(filterFeatured?' on':'');
-      _doFilterRender();
-    };
-    tabs.appendChild(tabFilterBtn);
+    // 閲覧者・オペレータ：タブバーには追加しない（ステータスバーに追加）
   }
   root.appendChild(tabs);
 
@@ -925,6 +917,17 @@ function mountMain(initState, role, opKey, initialTab){
   var clockEl=document.getElementById('hdr-clock');
   if(role==='viewer')statusBar.appendChild(el('span',{className:'viewer-chip'},'閲覧'));
   statusBar.appendChild(statusDot);statusBar.appendChild(statusText);
+  // 閲覧者・オペレータ：ステータスバー右端にフィルタボタン（常に表示・スクロール外）
+  if(role!=='admin'){
+    var statusFilterBtn=el('button',{className:'status-filter-btn'},'☆ 注目のみ表示');
+    statusFilterBtn.onclick=function(){
+      filterFeatured=!filterFeatured;
+      statusFilterBtn.textContent=filterFeatured?'★ 注目をすべて表示':'☆ 注目のみ表示';
+      statusFilterBtn.className='status-filter-btn'+(filterFeatured?' on':'');
+      _doFilterRender();
+    };
+    statusBar.appendChild(statusFilterBtn);
+  }
   root.appendChild(statusBar);
 
   // emergency/pause overlay
