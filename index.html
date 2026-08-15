@@ -919,7 +919,9 @@ function mountMain(initState, role, opKey, initialTab){
   root.appendChild(tabs);
 
   // status bar - ステータスドット＋テキストのみ
-  var statusBar=el('div',{className:'status-bar'});
+  // 閲覧者・オペレータはステータスバーをスクロール対象に（stickyなし）
+  var statusBarStyle=role==='admin'?{}:{position:'static',boxShadow:'none'};
+  var statusBar=el('div',{className:'status-bar',style:statusBarStyle});
   var statusDot=el('span',{className:'status-dot waiting'});
   var statusText=el('span',{});
   var clockEl=document.getElementById('hdr-clock');
@@ -1280,7 +1282,7 @@ function mountMain(initState, role, opKey, initialTab){
     }
 
     // 管理者のみ：ctrl-row内にフィルタボタンを追加
-    if(canEdit){
+    if(role==='admin'){
       var filterBtn=el('button',{className:'btn btn-gray',style:{marginLeft:'auto',fontSize:13,padding:'8px 14px'}},
         '☆ 注目のみ表示');
       filterBtn.onclick=function(){
