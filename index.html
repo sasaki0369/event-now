@@ -1470,11 +1470,18 @@ function mountMain(initState, role, opKey, initialTab){
       var rowCls='prog-row '+(isDone?(p.isEstimated?'done-row estimated-row':'done-row'):isNext?'next-row':'');
       if(p.isFeatured)rowCls+=' featured-row';
       var row=el('div',{className:rowCls.trim(),style:{cursor:p.isFeatured?'pointer':''}});
-      // 注目イベントはタップで詳細モーダルを表示
+      // 注目イベント：カード全体タップで詳細/編集モーダル
+      // ※ 開始ボタン・✓ボタン・★ボタンのクリックはstopPropagationで除外
       if(p.isFeatured){
         row.onclick=function(e){
-          if(e.target.classList&&e.target.classList.contains('featured-star'))return;
-          showFeaturedDetail(p);
+          if(e.target.classList&&(
+            e.target.classList.contains('featured-star')||
+            e.target.classList.contains('start-btn')||
+            e.target.classList.contains('check-mark')
+          ))return;
+          // 管理者・オペレータは編集モーダル、閲覧者は詳細モーダル
+          if(canEdit){showFeaturedRegister(p);}
+          else{showFeaturedDetail(p);}
         };
       }
 
@@ -1482,12 +1489,21 @@ function mountMain(initState, role, opKey, initialTab){
       var leftCol=el('div',{className:'prog-btn-col'});
       if(isDone){
         var ck=el('div',{className:'check-mark'},'✓');
-        if(canEdit){ck.onclick=function(){showEditDialog(p,canEdit,function(){doCancel(p.id);},function(t){doEditTime(p.id,t);});};}
-        else{ck.style.cursor='default';}
+        if(canEdit){
+          ck.onclick=function(e){
+            e.stopPropagation(); // 注目行の場合にrow.onclickが発火しないよう
+            showEditDialog(p,canEdit,function(){doCancel(p.id);},function(t){doEditTime(p.id,t);});
+          };
+        } else{ck.style.cursor='default';}
         leftCol.appendChild(ck);
       } else if(canEdit&&!state.isPaused&&!state.isEmergency){
         var sb=el('button',{className:'start-btn'},'▶');
-        (function(pid,pname,sched){sb.onclick=function(){showStartConfirm(pname,sched,function(t){doStart(pid,t);});};})(p.id,p.program,p.scheduledTime);
+        (function(pid,pname,sched){
+          sb.onclick=function(e){
+            e.stopPropagation(); // 注目行の場合にrow.onclickが発火しないよう
+            showStartConfirm(pname,sched,function(t){doStart(pid,t);});
+          };
+        })(p.id,p.program,p.scheduledTime);
         leftCol.appendChild(sb);
       } else if(canEdit){
         var pb=el('button',{className:'start-btn paused-state'},'▶');
