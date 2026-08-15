@@ -92,7 +92,7 @@ input:focus,textarea:focus{outline:none}
 .section-label{padding:16px 18px 6px;font-size:12px;color:var(--ink3);letter-spacing:.12em;text-transform:uppercase;border-bottom:1px solid var(--rule);scroll-margin-top:140px}
 
 /* ── Program row (深津スタイル) ── */
-.prog-row{display:grid;grid-template-columns:52px 1fr auto;align-items:center;min-height:76px;padding:14px 18px;border-bottom:1px solid var(--rule);gap:14px;background:white;transition:background .1s;position:relative}
+.prog-row{display:grid;grid-template-columns:52px 1fr auto 28px;align-items:center;min-height:76px;padding:14px 18px;border-bottom:1px solid var(--rule);gap:10px;background:white;transition:background .1s;position:relative}
 .prog-row.done-row{background:#f7fdf6}
 .prog-row.estimated-row{background:repeating-linear-gradient(135deg,#f7f7f7 0px,#f7f7f7 6px,#fafafa 6px,#fafafa 12px);opacity:.8}
 .prog-row.done-row .prog-name{text-decoration:line-through;text-decoration-color:var(--ink3);color:var(--ink3)}
@@ -101,7 +101,7 @@ input:focus,textarea:focus{outline:none}
 .prog-row.next-row .prog-name{font-weight:700}
 .prog-row.featured-row{background:linear-gradient(135deg,#fffbeb,#fef3c7);border-left:4px solid #f59e0b}
 .prog-row.featured-row .prog-name{color:#92400e}
-.featured-star{font-size:18px;color:#d1d5db;cursor:pointer;padding:4px;border:none;background:none;flex-shrink:0;line-height:1}
+.featured-star{font-size:18px;color:#d1d5db;cursor:pointer;padding:2px;border:none;background:none;flex-shrink:0;line-height:1;align-self:center;justify-self:center}
 .featured-star.on{color:#f59e0b}
 .featured-badge{display:inline-flex;align-items:center;gap:3px;font-size:10px;color:#92400e;background:#fde68a;border-radius:4px;padding:1px 5px;font-weight:700;margin-top:2px}
 
@@ -179,7 +179,7 @@ input:focus,textarea:focus{outline:none}
   .content{font-size:16px}
   .card{padding:20px 28px}
   .section-label{padding:22px 32px 10px;font-size:13px}
-  .prog-row{grid-template-columns:72px 1fr auto;min-height:96px;padding:20px 32px;gap:22px}
+  .prog-row{grid-template-columns:72px 1fr auto 36px;min-height:96px;padding:20px 32px;gap:14px}
   .prog-name{font-size:28px}
   .prog-row.next-row .prog-name{font-size:34px}
   .prog-sched{font-size:14px}
@@ -1183,6 +1183,7 @@ function mountMain(initState, role, opKey, initialTab){
   var progTabEl=null;
   var progList=null;
   var pauseBtn=null,emergBtn=null,resetBtn=null,emergBanner=null,clearBtn=null;
+  var filterFeatured=false; // 注目イベントフィルタ
 
   function buildProgressTab(){
     var ctrl=canEdit?el('div',{className:'ctrl-row'},[]):null;
@@ -1220,7 +1221,11 @@ function mountMain(initState, role, opKey, initialTab){
           // ── 2) 完全にクリーンな配列を作ってローカルstateを直接書き換え ──
           var cleared=ps.map(function(p){
             return {id:p.id||uid(),scheduledTime:p.scheduledTime||'',
-              target:p.target||'',program:p.program||''};
+              target:p.target||'',program:p.program||'',
+              // 注目メモは進行クリアでも保持する
+              isFeatured:p.isFeatured||false,
+              featuredNote:p.featuredNote||'',
+              featuredAt:p.featuredAt||null};
           });
           state=Object.assign({},state,{programs:cleared,isPaused:false,isEmergency:false,_t:Date.now()});
 
@@ -1236,7 +1241,19 @@ function mountMain(initState, role, opKey, initialTab){
           });
         });
       };
+      // 注目フィルタボタン
+      var filterBtn=el('button',{className:'btn btn-gray',style:{marginLeft:'auto',fontSize:13,padding:'8px 14px'}},
+        '☆ 注目のみ表示');
+      filterBtn.onclick=function(){
+        filterFeatured=!filterFeatured;
+        filterBtn.textContent=filterFeatured?'★ 全て表示':'☆ 注目のみ表示';
+        filterBtn.style.background=filterFeatured?'#fef3c7':'';
+        filterBtn.style.color=filterFeatured?'#92400e':'';
+        filterBtn.style.borderColor=filterFeatured?'#f59e0b':'';
+        renderPrograms();
+      };
       ctrl.appendChild(pauseBtn);ctrl.appendChild(emergBtn);ctrl.appendChild(resetBtn);ctrl.appendChild(clearBtn);
+      ctrl.appendChild(filterBtn);
     }
 
     // 緊急停止バナー（進行エリア内）
@@ -1343,6 +1360,43 @@ function mountMain(initState, role, opKey, initialTab){
   function renderPrograms(){
     if(!progList)return;
     progList.innerHTML='';
+    var progs=estimateAll(state.programs||[]);
+
+    // 注目フィルタが有効な場合は注目イベントのみ表示
+    if(filterFeatured){
+      var featuredProgs=progs.filter(function(p){return p.isFeatured;});
+      if(featuredProgs.length===0){
+        progList.appendChild(el('div',{style:{padding:'32px 18px',color:'var(--ink3)',fontSize:14,textAlign:'center'}},'注目イベントはありません'));
+        return;
+      }
+      // 注目イベントのみをフラットに表示（セクション区切りなし）
+      progList.appendChild(el('div',{className:'section-label'},'★ 注目イベント（'+featuredProgs.length+'件）'));
+      featuredProgs.forEach(function(p){
+        var isDone=p.status==='started';
+        var rowCls='prog-row featured-row';
+        var row=el('div',{className:rowCls,style:{cursor:'pointer'}});
+        row.onclick=function(e){
+          if(e.target.classList&&e.target.classList.contains('featured-star'))return;
+          showFeaturedDetail(p);
+        };
+        var dot=el('div',{className:'prog-btn-col'});
+        dot.appendChild(el('span',{style:{fontSize:22,color:'#f59e0b',lineHeight:'1'}},'★'));
+        var info=el('div',{className:'prog-info'});
+        info.appendChild(el('div',{className:'prog-sched'},p.scheduledTime||'--:--'));
+        info.appendChild(el('div',{className:'prog-name',style:{color:'#92400e'}},p.program));
+        if(p.target)info.appendChild(el('div',{className:'prog-target'},p.target));
+        if(p.featuredNote)info.appendChild(el('div',{style:{fontSize:12,color:'#92400e',marginTop:3}},p.featuredNote));
+        var right=el('div',{className:'time-right'});
+        right.appendChild(el('span',{className:'time-label'},isDone?'開始':'予測'));
+        right.appendChild(el('div',{className:'time-val',style:{color:isDone?'#2e7d32':'var(--ink)'}},isDone?fmtISO(p.startedAt):(p._est||'--:--')));
+        var starBtn=el('button',{className:'featured-star on'});
+        starBtn.textContent='★';
+        if(canEdit)(function(prog){starBtn.onclick=function(e){e.stopPropagation();showFeaturedRegister(prog);};})(p);
+        row.appendChild(dot);row.appendChild(info);row.appendChild(right);row.appendChild(starBtn);
+        progList.appendChild(row);
+      });
+      return; // フィルタ中は以降の通常描画をスキップ
+    }
     var progs=estimateAll(state.programs||[]);
 
     // 最後の開始済みインデックスを特定
