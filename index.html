@@ -97,6 +97,11 @@ input:focus,textarea:focus{outline:none}
 .prog-row{display:grid;grid-template-columns:52px 1fr auto 38px;align-items:center;min-height:76px;padding:14px 18px;border-bottom:1px solid var(--rule);gap:10px;background:white;transition:background .1s;position:relative}
 .prog-row.done-row{background:#f7fdf6}
 .prog-row.estimated-row{background:repeating-linear-gradient(135deg,#f7f7f7 0px,#f7f7f7 6px,#fafafa 6px,#fafafa 12px);opacity:.8}
+/* 注目イベント＋開始済み：琥珀色で強調 */
+.prog-row.featured-row.done-row{background:linear-gradient(135deg,#fef3c7,#fde68a);border-left:4px solid #d97706;opacity:1}
+.prog-row.featured-row.done-row .prog-name{color:#78350f;text-decoration:line-through;text-decoration-color:#b45309}
+.prog-row.featured-row.done-row .time-val{color:#92400e}
+.prog-row.featured-row.done-row .check-mark{color:#d97706;font-size:22px}
 .prog-row.done-row .prog-name{text-decoration:line-through;text-decoration-color:var(--ink3);color:var(--ink3)}
 .prog-row.next-row{background:white}
 .prog-row.next-row::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
