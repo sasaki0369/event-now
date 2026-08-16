@@ -1450,8 +1450,12 @@ function mountMain(initState, role, opKey, initialTab){
         if(p.target)info.appendChild(el('div',{className:'prog-target'},p.target));
         if(p.featuredNote)info.appendChild(el('div',{style:{fontSize:12,color:'#92400e',marginTop:3}},p.featuredNote));
         var right=el('div',{className:'time-right'});
-        right.appendChild(el('span',{className:'time-label'},isDone?'開始':'予測'));
-        right.appendChild(el('div',{className:'time-val',style:{color:isDone?'#2e7d32':'var(--ink)'}},isDone?fmtISO(p.startedAt):(p._est||'--:--')));
+        var timeLabel=isDone?'開始':'予測';
+        var timeLabelColor=isDone&&p.isFeatured?'#d97706':'';
+        right.appendChild(el('span',{className:'time-label',style:{color:timeLabelColor||''}},timeLabel));
+        // 注目イベント開始済みは琥珀色、通常開始済みは緑
+        var timeColor=isDone?(p.isFeatured?'#d97706':'#2e7d32'):'var(--ink)';
+        right.appendChild(el('div',{className:'time-val',style:{color:timeColor}},isDone?fmtISO(p.startedAt):(p._est||'--:--')));
         var starBtn=el('button',{className:'featured-star on'});
         starBtn.textContent='★';
         if(canEdit)(function(prog){starBtn.onclick=function(e){e.stopPropagation();showFeaturedRegister(prog);};})(p);
