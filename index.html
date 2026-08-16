@@ -1761,35 +1761,37 @@ function mountMain(initState, role, opKey, initialTab){
   // 進行タブで開始時は「次の試合」へスクロール（閲覧URL・イベント切替を含む）
   if(activeTab==='progress')scrollToNext();
 
-  // ── 閲覧者のみ：7秒無操作で次の試合へ自動スクロール ──
-  if(role==='viewer'){
-    var _autoScrollTimer=null;
-    var _autoScrollEnabled=true;
+  // ── 全ロール共通：7秒無操作で次の試合へ自動スクロール ──
+  var _autoScrollTimer=null;
+  var _autoScrollEnabled=true;
 
-    function resetAutoScroll(){
-      if(_autoScrollTimer)clearTimeout(_autoScrollTimer);
-      if(!_autoScrollEnabled)return;
-      _autoScrollTimer=setTimeout(function(){
-        if(activeTab==='progress')scrollToNext();
-      },7000);
-    }
-
-    // ユーザー操作でタイマーリセット
-    ['touchstart','touchmove','scroll','click','keydown'].forEach(function(ev){
-      document.addEventListener(ev,resetAutoScroll,{passive:true});
-    });
-
-    // 進行タブが表示されているときのみ有効
-    var origSwitchTab=switchTab;
-    function switchTab(tab){
-      origSwitchTab(tab);
-      _autoScrollEnabled=(tab==='progress');
-      resetAutoScroll();
-    }
-    tabProg&&(tabProg.onclick=function(){switchTab('progress');scrollToNext();});
-
-    resetAutoScroll(); // 初回起動
+  function resetAutoScroll(){
+    if(_autoScrollTimer)clearTimeout(_autoScrollTimer);
+    if(!_autoScrollEnabled)return;
+    _autoScrollTimer=setTimeout(function(){
+      if(activeTab==='progress')scrollToNext();
+    },7000);
   }
+
+  // ユーザー操作でタイマーリセット
+  ['touchstart','touchmove','scroll','click','keydown'].forEach(function(ev){
+    document.addEventListener(ev,resetAutoScroll,{passive:true});
+  });
+
+  // 進行タブが表示されているときのみ有効
+  tabProg&&(tabProg.onclick=function(){
+    switchTab('progress');
+    scrollToNext();
+    _autoScrollEnabled=true;
+    resetAutoScroll();
+  });
+  tabSetup&&(tabSetup.onclick=function(){
+    switchTab('setup');
+    _autoScrollEnabled=false;
+    if(_autoScrollTimer)clearTimeout(_autoScrollTimer);
+  });
+
+  resetAutoScroll(); // 初回起動
 }
 
 // SVG icons
