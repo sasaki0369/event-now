@@ -1439,7 +1439,7 @@ function mountMain(initState, role, opKey, initialTab){
       progList.appendChild(el('div',{className:'section-label'},'★ 注目イベント（'+featuredProgs.length+'件）'));
       featuredProgs.forEach(function(p){
         var isDone=p.status==='started';
-        var rowCls='prog-row featured-row';
+        var rowCls='prog-row featured-row'+(isDone?' done-row':'');
         var row=el('div',{className:rowCls,style:{cursor:'pointer'}});
         row.onclick=function(e){
           if(e.target.classList&&e.target.classList.contains('featured-star'))return;
@@ -1569,8 +1569,8 @@ function mountMain(initState, role, opKey, initialTab){
       // ── 右列：時刻 ──
       var right=el('div',{className:'time-right'});
       if(isDone){
-        right.appendChild(el('span',{className:'time-label'},'開始'));
-        right.appendChild(el('div',{className:'time-val'},fmtISO(p.startedAt)||'--:--'));
+        right.appendChild(el('span',{className:'time-label',style:{color:'#d97706'}},'開始'));
+        right.appendChild(el('div',{className:'time-val',style:{color:'#3b1f00'}},fmtISO(p.startedAt)||'--:--'));
         if(p.scheduledTime){
           var diff=Math.round((parseTimeToMs(fmtISO(p.startedAt))-parseTimeToMs(p.scheduledTime))/60000);
           if(!isNaN(diff)&&diff!==0){
