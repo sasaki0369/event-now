@@ -1566,14 +1566,14 @@ function mountMain(initState, role, opKey, initialTab){
       var leftCol=el('div',{className:'prog-btn-col'});
       if(isDone){
         var ck=el('div',{className:'check-mark'},'✓');
-        if(canEdit){
+        if(canEdit&&!state.isEnded){
           ck.onclick=function(e){
             e.stopPropagation(); // 注目行の場合にrow.onclickが発火しないよう
             showEditDialog(p,canEdit,function(){doCancel(p.id);},function(t){doEditTime(p.id,t);});
           };
         } else{ck.style.cursor='default';}
         leftCol.appendChild(ck);
-      } else if(canEdit&&!state.isPaused&&!state.isEmergency){
+      } else if(canEdit&&!state.isPaused&&!state.isEmergency&&!state.isEnded){
         var sb=el('button',{className:'start-btn'},'▶');
         (function(pid,pname,sched){
           sb.onclick=function(e){
@@ -1735,6 +1735,7 @@ function mountMain(initState, role, opKey, initialTab){
     if(activeTab==='progress'){renderPrograms();refreshStatusBar();}
   }
   function doStart(pid,timeStr){
+    if(state.isEnded){showSnackbar('このイベントは終了済みです');return;}
     var name=opName.trim()||state.adminName||'（未入力）';
     var d=new Date();
     if(timeStr){var parts=timeStr.split(':');d=new Date();d.setHours(+parts[0],+parts[1],0,0);}
