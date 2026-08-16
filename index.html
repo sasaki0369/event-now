@@ -844,6 +844,11 @@ function mountMain(initState, role, opKey, initialTab){
   clearTimers();
   var state=initState;
   var canEdit=(role!=='viewer');
+  // 終了済みイベントはすべてのロールで編集不可
+  var ONE_MONTH=30*24*60*60*1000;
+  var isEnded=!!(state.isEnded||state.endedAt);
+  var isExpired=state.endedAt&&(Date.now()-new Date(state.endedAt).getTime()>ONE_MONTH);
+  if(isEnded)canEdit=false;
   var activeTab=initialTab||(canEdit?'setup':'progress');
   if(role==='operator'||role==='viewer')activeTab='progress';
   var opName=role==='admin'?(initState.adminName||'運営管理者'):(initState.adminName||'運営管理者');
@@ -929,6 +934,19 @@ function mountMain(initState, role, opKey, initialTab){
     tabs.appendChild(tabFeaturedBtn);
   }
   root.appendChild(tabs);
+
+  // 終了済みバナー（全ロール・タブバー直下に固定表示）
+  if(isEnded){
+    var bannerMsg=isExpired?'このイベントは終了しました':'終了済み　閲覧のみ可能です';
+    var endedBannerEl=el('div',{style:{
+      background:isExpired?'#374151':'#92400e',
+      color:'white',textAlign:'center',fontSize:13,fontWeight:700,
+      padding:'9px 16px',letterSpacing:'.06em',flexShrink:0,
+      position:'sticky',top:isExpired?'87px':'87px',zIndex:34,
+      borderBottom:'2px solid rgba(255,255,255,.15)'
+    }},isExpired?'🏁 このイベントは終了しました':'🏁 終了済み — 閲覧のみ（開始・編集は無効）');
+    root.appendChild(endedBannerEl);
+  }
 
   // status bar - ステータスドット＋テキストのみ
   // 閲覧者・オペレータはステータスバーをスクロール対象に（stickyなし）
@@ -1174,6 +1192,7 @@ function mountMain(initState, role, opKey, initialTab){
           }},'🔑 イベントID共有'),
         ]),
       ]),
+      // 実績エクスポート・履歴保存カード
       el('div',{className:'card'},[
         el('div',{className:'section-title'},'実績エクスポート・履歴保存'),
         el('div',{style:{fontSize:12,color:'var(--ink3)',marginBottom:12,lineHeight:'1.7'}},[
@@ -1210,6 +1229,31 @@ function mountMain(initState, role, opKey, initialTab){
         el('div',{className:'recovery-row'},[recInp,recBtn]),
         el('div',{style:{fontSize:10,color:'#94a3b8',marginTop:6}},'Event ID: '+state.eventId),
       ]),
+      // イベント終了ボタン（管理者のみ・未終了の場合）
+      !isEnded?(function(){
+        var endBtn=el('button',{style:{
+          margin:'4px 0 4px',width:'100%',padding:'12px',fontSize:14,
+          background:'none',border:'1.5px solid #9ca3af',borderRadius:4,
+          color:'#6b7280',cursor:'pointer',fontFamily:'var(--sans)',fontWeight:600
+        }},'🏁 このイベントを終了する');
+        endBtn.onclick=function(){
+          showConfirm(
+            'イベントを終了しますか？\n\n・開始ボタンが無効になります\n・閲覧は引き続き可能です\n・1ヶ月後に「終了しました」表示になります',
+            function(){
+              // 終了前に自動で履歴保存
+              saveHistory(state,function(){
+                upd({isEnded:true,endedAt:new Date().toISOString()});
+                showSnackbar('イベントを終了しました。履歴にも保存されました。');
+                // 準備タブを再描画して終了ボタンを隠す
+                var newTab=buildSetupTab();
+                content.innerHTML='';
+                content.appendChild(newTab);
+              });
+            }
+          );
+        };
+        return el('div',{style:{padding:'0'}},endBtn);
+      })():el('span',null,''),
       // イベント一覧へ戻るボタン
       (function(){
         var listBtn=el('button',{className:'btn btn-gray',style:{margin:'4px 0 16px',width:'100%',padding:'12px',fontSize:14}},'← イベント一覧に戻る');
