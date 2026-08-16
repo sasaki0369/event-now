@@ -1804,17 +1804,18 @@ function mountMain(initState, role, opKey, initialTab){
   render(root);
   switchTab(activeTab);
   // 進行タブで開始時は「次の試合」へスクロール（閲覧URL・イベント切替を含む）
-  if(activeTab==='progress')scrollToNext();
+  // 終了済みでない場合のみ自動スクロール
+  if(activeTab==='progress'&&!state.isEnded)scrollToNext();
 
-  // ── 全ロール共通：7秒無操作で次の試合へ自動スクロール ──
+  // ── 全ロール共通：7秒無操作で次の試合へ自動スクロール（終了済みは無効）──
   var _autoScrollTimer=null;
-  var _autoScrollEnabled=true;
+  var _autoScrollEnabled=!state.isEnded; // 終了済みなら最初から無効
 
   function resetAutoScroll(){
     if(_autoScrollTimer)clearTimeout(_autoScrollTimer);
-    if(!_autoScrollEnabled)return;
+    if(!_autoScrollEnabled||state.isEnded)return; // 終了済みは常にスキップ
     _autoScrollTimer=setTimeout(function(){
-      if(activeTab==='progress')scrollToNext();
+      if(activeTab==='progress'&&!state.isEnded)scrollToNext();
     },7000);
   }
 
