@@ -97,14 +97,18 @@ input:focus,textarea:focus{outline:none}
 .prog-row{display:grid;grid-template-columns:52px 1fr auto 38px;align-items:center;min-height:76px;padding:14px 18px;border-bottom:1px solid var(--rule);gap:10px;background:white;transition:background .1s;position:relative}
 .prog-row.done-row{background:#f7fdf6}
 .prog-row.estimated-row{background:repeating-linear-gradient(135deg,#f7f7f7 0px,#f7f7f7 6px,#fafafa 6px,#fafafa 12px);opacity:.8}
-/* 注目イベント＋開始済み：濃いアンバーで強調（未開始注目の淡い黄色と明確に区別） */
-.prog-row.featured-row.done-row{background:linear-gradient(135deg,#fbbf24,#f59e0b);border-left:4px solid #b45309;opacity:1}
-.prog-row.featured-row.done-row .prog-name{color:#3b1f00;text-decoration:line-through;text-decoration-color:#92400e;font-weight:700}
-.prog-row.featured-row.done-row .time-val{color:#3b1f00}
-.prog-row.featured-row.done-row .check-mark{color:#78350f;font-size:22px}
-.prog-row.featured-row.done-row .prog-sched{color:#92400e}
-.prog-row.featured-row.done-row .prog-target{color:#78350f}
-.prog-row.featured-row.done-row .started-meta{color:#92400e}
+/* 注目イベント（未開始）：鮮やかな黄→目立つ */
+.prog-row.featured-row{background:linear-gradient(135deg,#fef08a,#fde047);border-left:4px solid #f59e0b}
+.prog-row.featured-row .prog-name{color:#78350f}
+/* 注目イベント＋開始済み：淡いクリーム→済んだことを示す */
+.prog-row.featured-row.done-row{background:linear-gradient(135deg,#fefce8,#fef9c3);border-left:4px solid #d4a017;opacity:1}
+.prog-row.featured-row.done-row .prog-name{color:#a67c52;text-decoration:line-through;text-decoration-color:#c9a96e;font-weight:400}
+.prog-row.featured-row.done-row .time-val{color:#a67c52}
+.prog-row.featured-row.done-row .check-mark{color:#c9a96e;font-size:22px}
+.prog-row.featured-row.done-row .prog-sched{color:#c9a96e}
+.prog-row.featured-row.done-row .prog-target{color:#b89a6a}
+.prog-row.featured-row.done-row .started-meta{color:#c9a96e}
+.prog-row.featured-row.done-row .featured-badge{background:#fef9c3;color:#a67c52}
 .prog-row.done-row .prog-name{text-decoration:line-through;text-decoration-color:var(--ink3);color:var(--ink3)}
 .prog-row.next-row{background:white}
 .prog-row.next-row::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
@@ -1454,10 +1458,10 @@ function mountMain(initState, role, opKey, initialTab){
         if(p.featuredNote)info.appendChild(el('div',{style:{fontSize:12,color:'#92400e',marginTop:3}},p.featuredNote));
         var right=el('div',{className:'time-right'});
         var timeLabel=isDone?'開始':'予測';
-        var timeLabelColor=isDone&&p.isFeatured?'#d97706':'';
+        var timeLabelColor=isDone&&p.isFeatured?'#c9a96e':'';
         right.appendChild(el('span',{className:'time-label',style:{color:timeLabelColor||''}},timeLabel));
-        // 注目イベント開始済みは琥珀色、通常開始済みは緑
-        var timeColor=isDone?(p.isFeatured?'#d97706':'#2e7d32'):'var(--ink)';
+        // 注目イベント開始済みは淡い茶色、通常開始済みは緑
+        var timeColor=isDone?(p.isFeatured?'#a67c52':'#2e7d32'):'var(--ink)';
         right.appendChild(el('div',{className:'time-val',style:{color:timeColor}},isDone?fmtISO(p.startedAt):(p._est||'--:--')));
         var starBtn=el('button',{className:'featured-star on'});
         starBtn.textContent='★';
@@ -1569,8 +1573,8 @@ function mountMain(initState, role, opKey, initialTab){
       // ── 右列：時刻 ──
       var right=el('div',{className:'time-right'});
       if(isDone){
-        right.appendChild(el('span',{className:'time-label',style:{color:'#d97706'}},'開始'));
-        right.appendChild(el('div',{className:'time-val',style:{color:'#3b1f00'}},fmtISO(p.startedAt)||'--:--'));
+        right.appendChild(el('span',{className:'time-label',style:{color:'#c9a96e'}},'開始'));
+        right.appendChild(el('div',{className:'time-val',style:{color:'#a67c52'}},fmtISO(p.startedAt)||'--:--'));
         if(p.scheduledTime){
           var diff=Math.round((parseTimeToMs(fmtISO(p.startedAt))-parseTimeToMs(p.scheduledTime))/60000);
           if(!isNaN(diff)&&diff!==0){
